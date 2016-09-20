@@ -16,6 +16,6 @@ clean:
 	rm -rf elm-stuff/build-artifacts
 
 watch:
-	@make
+	-@make
 	@echo Waiting for changes…
 	@fswatch -o -0 src | xargs -0 -n1 -I{} make
