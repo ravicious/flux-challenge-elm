@@ -19,3 +19,6 @@ watch:
 	-@make
 	@echo Waiting for changes…
 	@fswatch -o -0 src | xargs -0 -n1 -I{} make
+
+main.min.js: main.js
+	-closure-compiler --js $< --js_output_file $@ --compilation_level ADVANCED_OPTIMIZATIONS
