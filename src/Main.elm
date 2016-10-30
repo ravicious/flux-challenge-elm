@@ -72,6 +72,11 @@ type alias Model =
     }
 
 
+isFrozen : Model -> Bool
+isFrozen model =
+    model.darkJediIdsOnCurrentPlanet |> (not << Set.isEmpty)
+
+
 {-| According to flux-challenge docs, this is the first jedi we're supposed to fetch.
 -}
 firstDarkJediIdToFetch : Int
@@ -233,12 +238,23 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         VisitPlanet newPlanet ->
-            ( { model
-                | currentPlanet = Just newPlanet
-              }
-                |> updateModelWithDarkJedisOnCurrentPlanet (Just newPlanet)
-            , Cmd.none
-            )
+            let
+                updatedModel =
+                    { model
+                        | currentPlanet = Just newPlanet
+                    }
+                        |> updateModelWithDarkJedisOnCurrentPlanet (Just newPlanet)
+
+                cmd =
+                    -- When the model is frozen, no new jedis are added to the roster.
+                    -- Thus, if the updated model is not frozen, we have to make sure
+                    -- to fetch new jedis in case any were dropped during the freeze.
+                    if isFrozen model && (not <| isFrozen updatedModel) then
+                        requestRelativeJedisIfEnoughSpace model.darkJedis
+                    else
+                        Cmd.none
+            in
+                ( updatedModel, cmd )
 
         ScrollUp ->
             let
@@ -255,20 +271,26 @@ update msg model =
                 ( updatedModel, requestRelativeJedisIfEnoughSpace updatedModel.darkJedis )
 
         AddNewDarkJedi newDarkJedi ->
-            let
-                updatedModel =
-                    { model
-                        | darkJedis =
-                            -- If for some reason adding the jedi failed, use the existing roster.
-                            addJediToRoster newDarkJedi model.darkJedis
-                                |> Maybe.withDefault model.darkJedis
-                    }
-                        |> updateModelWithDarkJedisOnCurrentPlanet model.currentPlanet
+            -- If the model is frozen, we're supposed to cancel all ongoing requests.
+            -- Since it's not straightforward to do in Elm,
+            -- we're dropping any incoming jedis instead.
+            if isFrozen model then
+                ( model, Cmd.none )
+            else
+                let
+                    updatedModel =
+                        { model
+                            | darkJedis =
+                                -- If for some reason adding the jedi failed, use the existing roster.
+                                addJediToRoster newDarkJedi model.darkJedis
+                                    |> Maybe.withDefault model.darkJedis
+                        }
+                            |> updateModelWithDarkJedisOnCurrentPlanet model.currentPlanet
 
-                command =
-                    requestRelativeJedisIfEnoughSpace updatedModel.darkJedis
-            in
-                ( updatedModel, command )
+                    command =
+                        requestRelativeJedisIfEnoughSpace updatedModel.darkJedis
+                in
+                    ( updatedModel, command )
 
         PlanetParsingError _ ->
             ( model, Cmd.none )
@@ -394,12 +416,15 @@ rosterToListItems roster darkJediIdsOnCurrentPlanet =
 view : Model -> Html Msg
 view model =
     let
+        isModelFrozen =
+            isFrozen model
+
         -- If the boundary jedis have no relatives, we should disable the buttons.
         isScrollUpDisabled =
-            not <| doesJediHaveRelativeJedi masterOfFirstJedi model.darkJedis
+            isModelFrozen || (not <| doesJediHaveRelativeJedi masterOfFirstJedi model.darkJedis)
 
         isScrollDownDisabled =
-            not <| doesJediHaveRelativeJedi apprenticeOfLastJedi model.darkJedis
+            isModelFrozen || (not <| doesJediHaveRelativeJedi apprenticeOfLastJedi model.darkJedis)
     in
         div [ class "css-root" ]
             [ h1 [ class "css-planet-monitor" ]
