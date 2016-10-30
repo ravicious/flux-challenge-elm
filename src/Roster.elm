@@ -8,6 +8,8 @@ module Roster
         , scrollDown
         , isEmpty
         , isFull
+        , isFirstPositionEmpty
+        , isLastPositionEmpty
         , toList
         , first
         , last
@@ -100,6 +102,31 @@ last roster =
     listLast roster.elements
 
 
+isFirstPositionEmpty : Roster a -> Bool
+isFirstPositionEmpty roster =
+    (roster.offset > 0) || (isEmpty roster)
+
+
+{-| To better understand this function, here are some example rosters. `a` represents
+a value of type `a` of `Roster a`.
+
+0               |   |   | a | a |   |   |   |   |   |
+1               | a |   | a | a | a | a |   |   |   |
+2               | a | a | a | a | a | a |   |   |   |
+3               |   | a | a | a | a | a |   | a |   |
+4               |   | a |   | a | a |   |   |   | a |
+----------------|---|---|---|---|---|---|---|---|---|
+Offset:         | 1 | 2 | 0 | 0 | 1 | 1 | 0 | 3 | 4 |
+No. of elements:| 2 | 3 | 4 | 5 | 4 | 3 | 5 | 1 | 1 |
+Roster size:    | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 |
+
+The equation below is false for all rosters with the last position occupied by an element.
+-}
+isLastPositionEmpty : Roster a -> Bool
+isLastPositionEmpty roster =
+    (roster.offset + (List.length roster.elements)) < roster.size
+
+
 
 -- Offset functions
 
@@ -132,11 +159,6 @@ decreaseOffset roster =
 -- Prepend
 
 
-isFirstPositionEmpty : Roster a -> Bool
-isFirstPositionEmpty roster =
-    (roster.offset > 0) || (isEmpty roster)
-
-
 prependElement : a -> Roster a -> Roster a
 prependElement element roster =
     { roster | elements = element :: roster.elements }
@@ -165,26 +187,6 @@ prepend newElement roster =
 
 
 -- Append
-
-
-{-| To better understand this function, here are some example rosters. `a` represents
-a value of type `a` of `Roster a`.
-
-0               |   |   | a | a |   |   |   |   |   |
-1               | a |   | a | a | a | a |   |   |   |
-2               | a | a | a | a | a | a |   |   |   |
-3               |   | a | a | a | a | a |   | a |   |
-4               |   | a |   | a | a |   |   |   | a |
-----------------|---|---|---|---|---|---|---|---|---|
-Offset:         | 1 | 2 | 0 | 0 | 1 | 1 | 0 | 3 | 4 |
-No. of elements:| 2 | 3 | 4 | 5 | 4 | 3 | 5 | 1 | 1 |
-Roster size:    | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 |
-
-The equation below is false for all rosters with the last position occupied by an element.
--}
-isLastPositionEmpty : Roster a -> Bool
-isLastPositionEmpty roster =
-    (roster.offset + (List.length roster.elements)) < roster.size
 
 
 append : a -> Roster a -> Maybe (Roster a)

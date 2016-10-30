@@ -7,17 +7,10 @@ import Fuzz
 
 -- Our imports
 
+import Utils exposing (applyNTimes)
 import Roster
 import Actions exposing (applyRosterScrollAction)
 import CustomFuzzers
-
-
-applyNTimes : Int -> (a -> a) -> a -> a
-applyNTimes n f val =
-    if n <= 0 then
-        val
-    else
-        applyNTimes (n - 1) f (f val)
 
 
 rosterTests : Test
