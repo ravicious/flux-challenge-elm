@@ -240,12 +240,6 @@ update msg model =
             , Cmd.none
             )
 
-        PlanetParsingError _ ->
-            ( model, Cmd.none )
-
-        FetchingDarkJediFailed _ ->
-            ( model, Cmd.none )
-
         ScrollUp ->
             let
                 updatedModel =
@@ -275,6 +269,12 @@ update msg model =
                     requestRelativeJedisIfEnoughSpace updatedModel.darkJedis
             in
                 ( updatedModel, command )
+
+        PlanetParsingError _ ->
+            ( model, Cmd.none )
+
+        FetchingDarkJediFailed _ ->
+            ( model, Cmd.none )
 
 
 
