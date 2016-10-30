@@ -2,12 +2,13 @@ module Main exposing (..)
 
 import Html exposing (..)
 import Html.App as App
-import Html.Attributes exposing (class, classList, disabled)
+import Html.Attributes exposing (class, classList, disabled, style)
 import Html.Events exposing (onClick)
 import WebSocket
 import Json.Decode as Json exposing ((:=))
 import Http
 import Task
+import Set exposing (Set)
 
 
 -- Our imports
@@ -47,8 +48,12 @@ type alias DarkJediMetaData =
     }
 
 
+type alias DarkJediId =
+    Int
+
+
 type alias DarkJedi =
-    { id : Int
+    { id : DarkJediId
     , name : String
     , homeworld : Planet
     , master : Maybe DarkJediMetaData
@@ -63,6 +68,7 @@ type alias DarkJediRoster =
 type alias Model =
     { currentPlanet : Maybe Planet
     , darkJedis : DarkJediRoster
+    , darkJediIdsOnCurrentPlanet : Set DarkJediId
     }
 
 
@@ -77,6 +83,7 @@ init : ( Model, Cmd Msg )
 init =
     ( { currentPlanet = Nothing
       , darkJedis = Roster.initialize darkJedisRosterSize
+      , darkJediIdsOnCurrentPlanet = Set.empty
       }
     , fetchDarkJedi firstDarkJediIdToFetch
     )
@@ -195,11 +202,43 @@ addJediToRoster newJedi roster =
         Nothing
 
 
+lookForJedisOnPlanet : Planet -> List DarkJedi -> Set DarkJediId
+lookForJedisOnPlanet planet darkJedis =
+    List.foldl
+        (\jedi jedisOnPlanet ->
+            if jedi.homeworld.id == planet.id then
+                Set.insert jedi.id jedisOnPlanet
+            else
+                jedisOnPlanet
+        )
+        Set.empty
+        darkJedis
+
+
+updateModelWithDarkJedisOnCurrentPlanet : Maybe Planet -> Model -> Model
+updateModelWithDarkJedisOnCurrentPlanet planet model =
+    case planet of
+        Just planet ->
+            { model
+                | darkJediIdsOnCurrentPlanet =
+                    lookForJedisOnPlanet planet
+                        (Roster.toElementsList model.darkJedis)
+            }
+
+        Nothing ->
+            model
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         VisitPlanet newPlanet ->
-            ( { model | currentPlanet = Just newPlanet }, Cmd.none )
+            ( { model
+                | currentPlanet = Just newPlanet
+              }
+                |> updateModelWithDarkJedisOnCurrentPlanet (Just newPlanet)
+            , Cmd.none
+            )
 
         PlanetParsingError _ ->
             ( model, Cmd.none )
@@ -230,6 +269,7 @@ update msg model =
                             addJediToRoster newDarkJedi model.darkJedis
                                 |> Maybe.withDefault model.darkJedis
                     }
+                        |> updateModelWithDarkJedisOnCurrentPlanet model.currentPlanet
 
                 command =
                     requestRelativeJedisIfEnoughSpace updatedModel.darkJedis
@@ -309,22 +349,46 @@ planetToText =
     (Maybe.map .name) >> Maybe.withDefault ""
 
 
-darkJediToListItem : Maybe DarkJedi -> Html Msg
-darkJediToListItem darkJedi =
+redTextStyle : Attribute msg
+redTextStyle =
+    style
+        [ ( "color", "red" )
+        ]
+
+
+noStyle : Attribute msg
+noStyle =
+    style []
+
+
+darkJediToListItem : Set DarkJediId -> Maybe DarkJedi -> Html Msg
+darkJediToListItem darkJediIdsOnCurrentPlanet darkJedi =
     case darkJedi of
         Just darkJedi ->
-            li [ class "css-slot" ]
-                [ h3 [] [ text darkJedi.name ]
-                , h6 [] [ text ("Homeworld: " ++ darkJedi.homeworld.name) ]
-                ]
+            let
+                isJediOnCurrentPlanet =
+                    Set.member darkJedi.id darkJediIdsOnCurrentPlanet
+
+                textStyle =
+                    if isJediOnCurrentPlanet then
+                        redTextStyle
+                    else
+                        noStyle
+            in
+                li [ class "css-slot" ]
+                    [ h3 [ textStyle ] [ text darkJedi.name ]
+                    , h6 [ textStyle ] [ text ("Homeworld: " ++ darkJedi.homeworld.name) ]
+                    ]
 
         Nothing ->
             li [ class "css-slot" ] []
 
 
-rosterToListItems : DarkJediRoster -> List (Html Msg)
-rosterToListItems =
-    Roster.toList >> List.map darkJediToListItem
+rosterToListItems : DarkJediRoster -> Set DarkJediId -> List (Html Msg)
+rosterToListItems roster darkJediIdsOnCurrentPlanet =
+    roster
+        |> Roster.toList
+        |> List.map (darkJediToListItem darkJediIdsOnCurrentPlanet)
 
 
 view : Model -> Html Msg
@@ -342,7 +406,10 @@ view model =
                 [ text ("Obi-Wan currently on " ++ (planetToText model.currentPlanet))
                 ]
             , section [ class "css-scrollable-list" ]
-                [ ul [ class "css-slots" ] (rosterToListItems model.darkJedis)
+                [ ul [ class "css-slots" ]
+                    (rosterToListItems model.darkJedis
+                        model.darkJediIdsOnCurrentPlanet
+                    )
                 , div [ class "css-scroll-buttons" ]
                     [ button
                         [ classList

@@ -11,6 +11,7 @@ module Roster
         , isFirstPositionEmpty
         , isLastPositionEmpty
         , toList
+        , toElementsList
         , first
         , last
         )
@@ -77,6 +78,11 @@ toList roster =
             , justElements
             , (List.repeat nToAppend Nothing)
             ]
+
+
+toElementsList : Roster a -> List a
+toElementsList roster =
+    roster.elements
 
 
 first : Roster a -> Maybe a
