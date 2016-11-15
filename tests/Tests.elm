@@ -33,7 +33,7 @@ rosterTests =
                         elementsToAppend
                             |> List.foldl
                                 (\element roster ->
-                                    roster `Maybe.andThen` (Roster.append element)
+                                    roster |> Maybe.andThen (Roster.append element)
                                 )
                                 (Just roster)
                 in
@@ -68,7 +68,7 @@ rosterTests =
                             >> (\roster ->
                                     (List.foldl
                                         (\element roster ->
-                                            roster `Maybe.andThen` (Roster.prepend element)
+                                            roster |> Maybe.andThen (Roster.prepend element)
                                         )
                                         roster
                                         elements
@@ -80,7 +80,7 @@ rosterTests =
                             >> (\roster ->
                                     (List.foldl
                                         (\element roster ->
-                                            roster `Maybe.andThen` (Roster.append element)
+                                            roster |> Maybe.andThen (Roster.append element)
                                         )
                                         roster
                                         (List.reverse elements)

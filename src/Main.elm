@@ -1,13 +1,11 @@
 module Main exposing (..)
 
 import Html exposing (..)
-import Html.App as App
 import Html.Attributes exposing (class, classList, disabled, style)
 import Html.Events exposing (onClick)
 import WebSocket
-import Json.Decode as Json exposing ((:=))
+import Json.Decode as Json exposing (field)
 import Http
-import Task
 import Set exposing (Set)
 
 
@@ -17,9 +15,9 @@ import Roster exposing (Roster)
 import Utils
 
 
-main : Program Never
+main : Program Never Model Msg
 main =
-    App.program
+    Html.program
         { init = init
         , view = view
         , update = update
@@ -109,7 +107,7 @@ relativeOfJedi :
     -> DarkJediRoster
     -> Maybe DarkJediMetaData
 relativeOfJedi fetchJedi fetchRelative =
-    fetchJedi >> (flip Maybe.andThen) fetchRelative
+    fetchJedi >> Maybe.andThen fetchRelative
 
 
 apprenticeOfLastJedi : DarkJediRoster -> Maybe DarkJediMetaData
@@ -187,8 +185,7 @@ requestRelativeJedisIfEnoughSpace roster =
 type Msg
     = VisitPlanet Planet
     | PlanetParsingError String
-    | FetchingDarkJediFailed Http.Error
-    | AddNewDarkJedi DarkJedi
+    | AddNewDarkJedi (Result Http.Error DarkJedi)
     | ScrollUp
     | ScrollDown
 
@@ -270,7 +267,7 @@ update msg model =
             in
                 ( updatedModel, requestRelativeJedisIfEnoughSpace updatedModel.darkJedis )
 
-        AddNewDarkJedi newDarkJedi ->
+        AddNewDarkJedi (Ok newDarkJedi) ->
             -- If the model is frozen, we're supposed to cancel all ongoing requests.
             -- Since it's not straightforward to do in Elm,
             -- we're dropping any incoming jedis instead.
@@ -292,10 +289,10 @@ update msg model =
                 in
                     ( updatedModel, command )
 
-        PlanetParsingError _ ->
+        AddNewDarkJedi (Err _) ->
             ( model, Cmd.none )
 
-        FetchingDarkJediFailed _ ->
+        PlanetParsingError _ ->
             ( model, Cmd.none )
 
 
@@ -305,22 +302,22 @@ update msg model =
 
 planetDecoder : Json.Decoder Planet
 planetDecoder =
-    Json.object2 Planet ("id" := Json.int) ("name" := Json.string)
+    Json.map2 Planet (field "id" Json.int) (field "name" Json.string)
 
 
 darkJediMetaDataDecoder : Json.Decoder DarkJediMetaData
 darkJediMetaDataDecoder =
-    Json.object2 DarkJediMetaData ("id" := Json.int) ("url" := Json.string)
+    Json.map2 DarkJediMetaData (field "id" Json.int) (field "url" Json.string)
 
 
 darkJediDecoder : Json.Decoder DarkJedi
 darkJediDecoder =
-    Json.object5 DarkJedi
-        ("id" := Json.int)
-        ("name" := Json.string)
-        ("homeworld" := planetDecoder)
-        (Json.maybe ("master" := darkJediMetaDataDecoder))
-        (Json.maybe ("apprentice" := darkJediMetaDataDecoder))
+    Json.map5 DarkJedi
+        (field "id" Json.int)
+        (field "name" Json.string)
+        (field "homeworld" planetDecoder)
+        (Json.maybe (field "master" darkJediMetaDataDecoder))
+        (Json.maybe (field "apprentice" darkJediMetaDataDecoder))
 
 
 
@@ -332,11 +329,8 @@ fetchDarkJedi id =
     let
         url =
             "http://localhost:3000/dark-jedis/" ++ (toString id)
-
-        handleFailure =
-            FetchingDarkJediFailed << Debug.log "Fetching dark jedi failed"
     in
-        Task.perform handleFailure AddNewDarkJedi <| Http.get darkJediDecoder url
+        Http.send AddNewDarkJedi <| Http.get url darkJediDecoder
 
 
 
