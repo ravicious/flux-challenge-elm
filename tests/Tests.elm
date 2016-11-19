@@ -65,27 +65,23 @@ rosterTests =
                     scrollUpThenPrepend =
                         (applyNTimes scrollTimes Roster.scrollUp)
                             >> Just
-                            >> (\roster ->
-                                    (List.foldl
-                                        (\element roster ->
-                                            roster |> Maybe.andThen (Roster.prepend element)
-                                        )
-                                        roster
-                                        elements
+                            >> \roster ->
+                                List.foldl
+                                    (\element roster ->
+                                        roster |> Maybe.andThen (Roster.prepend element)
                                     )
-                               )
+                                    roster
+                                    elements
 
                     append =
                         Just
-                            >> (\roster ->
-                                    (List.foldl
-                                        (\element roster ->
-                                            roster |> Maybe.andThen (Roster.append element)
-                                        )
-                                        roster
-                                        (List.reverse elements)
+                            >> \roster ->
+                                List.foldl
+                                    (\element roster ->
+                                        roster |> Maybe.andThen (Roster.append element)
                                     )
-                               )
+                                    roster
+                                    (List.reverse elements)
                 in
                     case ( (scrollUpThenPrepend roster), (append roster) ) of
                         ( Just prependRoster, Just appendRoster ) ->
