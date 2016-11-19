@@ -1,7 +1,8 @@
 {
-    "elm-lang/virtual-dom": "2.0.0",
+    "elm-lang/virtual-dom": "2.0.1",
     "elm-lang/websocket": "1.0.2",
     "elm-lang/html": "2.0.0",
     "elm-lang/http": "1.0.0",
+    "Skinney/elm-array-exploration": "1.0.0",
     "elm-lang/core": "5.0.0"
 }

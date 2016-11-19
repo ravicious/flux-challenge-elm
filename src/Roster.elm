@@ -16,19 +16,12 @@ module Roster
         , last
         )
 
+import Array.Hamt as Array
+
 
 type alias Roster a =
     { size : Int
-    , elements :
-        -- In an ideal world we'd use a data structure that can efficiently add new elements
-        -- to both sides and that can return its size in constant time. Since the actuall app
-        -- is going to store no more than five elements, Array would be a good candidate
-        -- despite linear prepending time.
-        --
-        -- However, the Elm Array implementation is quite buggy [1], so instead of fighting
-        -- with it, let's use a List for the time being.
-        -- [1]: https://github.com/elm-lang/core/issues/649
-        List a
+    , elements : Array.Array a
     , offset :
         -- Index of the roster at which the first element starts.
         Int
@@ -42,9 +35,27 @@ initialize size =
             max 0 size
     in
         { size = normalizedSize
-        , elements = []
+        , elements = Array.empty
         , offset = 0
         }
+
+
+
+-- Array helpers
+
+
+arrayLast : Array.Array a -> Maybe a
+arrayLast array =
+    let
+        arrayLength =
+            Array.length array
+    in
+        Array.get (arrayLength - 1) array
+
+
+arrayTail : Array.Array a -> Array.Array a
+arrayTail array =
+    Array.slice 1 ((Array.length array) - 1) array
 
 
 
@@ -53,12 +64,12 @@ initialize size =
 
 isEmpty : Roster a -> Bool
 isEmpty roster =
-    List.isEmpty roster.elements
+    Array.isEmpty roster.elements
 
 
 isFull : Roster a -> Bool
 isFull roster =
-    List.length roster.elements == roster.size
+    Array.length roster.elements == roster.size
 
 
 toList : Roster a -> List (Maybe a)
@@ -68,44 +79,31 @@ toList roster =
             roster.offset
 
         nToAppend =
-            roster.size - nToPrepend - (List.length roster.elements)
+            roster.size - nToPrepend - (Array.length roster.elements)
 
         justElements =
-            List.map Just roster.elements
+            Array.map Just roster.elements
     in
         List.concat
             [ (List.repeat nToPrepend Nothing)
-            , justElements
+            , (Array.toList justElements)
             , (List.repeat nToAppend Nothing)
             ]
 
 
 toElementsList : Roster a -> List a
 toElementsList roster =
-    roster.elements
+    Array.toList roster.elements
 
 
 first : Roster a -> Maybe a
 first roster =
-    List.head roster.elements
-
-
-listLast : List a -> Maybe a
-listLast list =
-    case list of
-        head :: [] ->
-            Just head
-
-        head :: tail ->
-            listLast tail
-
-        [] ->
-            Nothing
+    Array.get 0 roster.elements
 
 
 last : Roster a -> Maybe a
-last roster =
-    listLast roster.elements
+last =
+    .elements >> arrayLast
 
 
 isFirstPositionEmpty : Roster a -> Bool
@@ -130,7 +128,7 @@ The equation below is false for all rosters with the last position occupied by a
 -}
 isLastPositionEmpty : Roster a -> Bool
 isLastPositionEmpty roster =
-    (roster.offset + (List.length roster.elements)) < roster.size
+    (roster.offset + (Array.length roster.elements)) < roster.size
 
 
 
@@ -167,12 +165,12 @@ decreaseOffset roster =
 
 prependElement : a -> Roster a -> Roster a
 prependElement element roster =
-    { roster | elements = element :: roster.elements }
+    { roster | elements = Array.append (Array.repeat 1 element) roster.elements }
 
 
 decreaseOffsetIfElementsPresent : Roster a -> Roster a
 decreaseOffsetIfElementsPresent roster =
-    if (List.isEmpty roster.elements) then
+    if (Array.isEmpty roster.elements) then
         roster
     else
         decreaseOffset roster
@@ -199,7 +197,7 @@ append : a -> Roster a -> Maybe (Roster a)
 append newElement roster =
     if isLastPositionEmpty roster then
         -- Appending an element to the end doesn't change the offset.
-        Just { roster | elements = List.append roster.elements [ newElement ] }
+        Just { roster | elements = Array.push newElement roster.elements }
     else
         Nothing
 
@@ -214,10 +212,11 @@ dropElementOnLastPositionIfAny roster =
         roster
     else
         let
-            nOfElementsToTake =
-                (List.length roster.elements) - 1
+            -- We need to exclude the last element of the array.
+            indexOfOneBeforeLastElement =
+                (Array.length roster.elements) - 2
         in
-            { roster | elements = List.take nOfElementsToTake roster.elements }
+            { roster | elements = Array.slice 0 indexOfOneBeforeLastElement roster.elements }
 
 
 scrollUp : Roster a -> Roster a
@@ -227,8 +226,8 @@ scrollUp =
 
 dropElementOnFirstPositionIfAny : Roster a -> Roster a
 dropElementOnFirstPositionIfAny roster =
-    if roster.offset == 0 && (not <| List.isEmpty roster.elements) then
-        { roster | elements = List.tail roster.elements |> Maybe.withDefault [] }
+    if roster.offset == 0 && (not <| Array.isEmpty roster.elements) then
+        { roster | elements = arrayTail roster.elements }
     else
         roster
 
